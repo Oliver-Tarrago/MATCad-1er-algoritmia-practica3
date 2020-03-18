@@ -1,3 +1,13 @@
+/**
+ * Nom:     Oriol
+ * Cognoms: Benítez Bravo
+ * NIU:     1566931
+ *
+ * Nom:     Oliver Einard
+ * Cognoms: Tarragó Boardman
+ * NIU:     1527541
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
