@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint-gcc.h>
 
 typedef enum { SUCCESS, NO_FILE, EMPTY_FILE, NO_MEMORY } RETURN;
 
@@ -11,6 +10,12 @@ typedef struct alu {
     float notes[5];
     struct alu *seg;
 } Alu;
+
+/**
+ * Assigna memòria per a un Alu i inicialitza el punter seg a NULL
+ * @return Punter a memòria de mida sizeof(Alu) si s'ha pogut assignar, NULL sino.
+ */
+Alu *new_Alu();
 
 float mitjana(const float *dades, int n);
 
@@ -27,7 +32,7 @@ void llegir_alumne(FILE *des_de, Alu *alumne);
 Alu *inserir(Alu *alumne, Alu *llista_ordenada);
 
 /**
- * Versió d'inserir fent servir recursivitat. És més ràpid però un stackoverflow si la llista és massa
+ * Versió d'inserir fent servir recursivitat. És més ràpid però pot haver un stack overflow si la llista és massa
  * gran. (> 100k elements)
  *
  * @see Alu *inserir(Alu *alumne, Alu *llista_ordenada)
@@ -38,7 +43,25 @@ Alu *inserir(Alu *alumne, Alu *llista_ordenada);
  */
 Alu *inserir_rec(Alu *alumne, Alu *llista_ordenada);
 
+/**
+ * Esborra un alumne de una llista d'alumnes
+ * @param niu NIU de l'alumne a esborrar
+ * @param llista_alumnes Llista d'alumnes
+ * @return Punter al primer element de la llista. Si l'alumne esborrat era el primer, serà un punter al segón element
+ * de la llista passada per argument, o NULL si l'element esborrat era l'únic element de la llista.
+ */
 Alu *esborrar(int niu, Alu *llista_alumnes);
+
+/**
+ * Versió d'esborrar fent servir recursivitat. En aquest cas, es més efectiva la versió sense recursivitat.
+ *
+ * @see Alu *esborrar(int niu, Alu *llista_alumnes)
+ *
+ * @param niu
+ * @param llista_alumnes
+ * @return
+ */
+Alu *esborrar_rec(int niu, Alu *llista_alumnes);
 
 void demanar_alumne(Alu *alumne);
 
@@ -59,7 +82,7 @@ int main() {
         return EMPTY_FILE;
     }
 
-    Alu *primer = (Alu *) malloc(sizeof(Alu));
+    Alu *primer = new_Alu();
     if (primer == NULL) {
         printf("Problema assignant espai de memoria\n");
         return NO_MEMORY;
@@ -71,7 +94,7 @@ int main() {
 
     Alu *anterior;
     while (fscanf(fitxer_dades, "%i;", &niu) != EOF) {
-        Alu *actual = (Alu *) malloc(sizeof(Alu));
+        Alu *actual = new_Alu();
         if (actual == NULL) {
             printf("Problema assignant espai de memoria\n");
             return NO_MEMORY;
@@ -100,7 +123,7 @@ int main() {
     int opcio;
     while ((opcio = menu()) != 3) {
         if (opcio == 1) {
-            Alu *alumne = (Alu *) malloc(sizeof(Alu));
+            Alu *alumne = new_Alu();
             if (alumne == NULL) {
                 printf("Problema assignant espai de memoria\n");
                 return NO_MEMORY;
@@ -120,6 +143,14 @@ int main() {
 
     printf("\nS'ha llegit informacio de %d linies.\n\n", length);
     return EXIT_SUCCESS;
+}
+
+Alu *new_Alu() {
+    Alu *alu = (Alu*) malloc(sizeof(Alu));
+    if (alu != NULL) {
+        alu->seg = NULL;
+    }
+    return alu;
 }
 
 int menu() {
@@ -178,15 +209,29 @@ Alu *inserir_rec(Alu *alumne, Alu *llista_ordenada) {
 
 Alu *esborrar(int niu, Alu *llista_alumnes) {
     Alu *actual = llista_alumnes, *anterior = NULL;
-    while (actual->niu != niu && actual->seg != NULL) {
+    while (actual != NULL && actual->niu != niu) {
         anterior = actual;
         actual = actual->seg;
     }
     if (actual != NULL) { // And then actual->niu == niu
-        if (anterior == NULL) { // actual == llista_alumnes
+        if (anterior == NULL) { // And then actual == llista_alumnes, that is, actual is the first element
             llista_alumnes = llista_alumnes->seg;
         } else {
             anterior->seg = actual->seg;
+        }
+        free(actual);
+    }
+    return llista_alumnes;
+}
+
+Alu *esborrar_rec(int niu, Alu *llista_alumnes) {
+    if (llista_alumnes != NULL) {
+        if (llista_alumnes->niu == niu) {
+            Alu *seg = llista_alumnes->seg;
+            free(llista_alumnes);
+            llista_alumnes = seg;
+        } else if (llista_alumnes->seg != NULL) {
+            llista_alumnes->seg = esborrar_rec(niu, llista_alumnes->seg);
         }
     }
     return llista_alumnes;
