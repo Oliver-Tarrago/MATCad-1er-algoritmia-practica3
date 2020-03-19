@@ -10,8 +10,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 typedef enum { SUCCESS, NO_FILE, EMPTY_FILE, NO_MEMORY } RETURN;
+
+void flush() {
+    for (int c = getchar(); c != EOF && c != '\n'; c = getchar());
+}
 
 typedef struct alu {
     int niu;
@@ -37,7 +42,7 @@ void llegir_alumne(FILE *des_de, Alu *alumne);
  * @param llista_ordenada Llista d'alumnes on inserir
  * @return Un punter al primer element de la llista
  */
-Alu *inserir(Alu *alumne, Alu *llista_ordenada);
+Alu * inserir(Alu *alumne, Alu *llista_ordenada);
 
 /**
  * Versió d'inserir fent servir recursivitat. És més ràpid però pot haver un stack overflow si la llista és massa
@@ -54,22 +59,21 @@ Alu *inserir_rec(Alu *alumne, Alu *llista_ordenada);
 /**
  * Esborra un alumne de una llista d'alumnes
  * @param niu NIU de l'alumne a esborrar
- * @param llista_alumnes Llista d'alumnes
- * @return Punter al primer element de la llista. Si l'alumne esborrat era el primer, serà un punter al segón element
- * de la llista passada per argument, o NULL si l'element esborrat era l'únic element de la llista.
+ * @param llista_alumnes Punter a la llista d'alumnes
+ * @return true si ha trobat i esborrat l'alumne, false sino
  */
-Alu *esborrar(int niu, Alu *llista_alumnes);
+bool esborrar(int niu, Alu **llista_alumnes);
 
 /**
  * Versió d'esborrar fent servir recursivitat. En aquest cas, es més efectiva la versió sense recursivitat.
  *
  * @see Alu *esborrar(int niu, Alu *llista_alumnes)
  *
- * @param niu
- * @param llista_alumnes
- * @return
+ * @param niu NIU de l'alumne a esborrar
+ * @param llista_alumnes Punter a la llista d'alumnes
+ * @return true si ha trobat i esborrat l'alumne, false sino
  */
-Alu *esborrar_rec(int niu, Alu *llista_alumnes);
+bool esborrar_rec(int niu, Alu **llista_alumnes);
 
 void demanar_alumne(Alu *alumne);
 
@@ -126,10 +130,10 @@ int main() {
         }
     }
     fclose(fitxer_dades);
-    printf("\nDades del fitxer llegides.\n");
+    printf("\nS'ha llegit informacio de %d linies.\n\n", length);
 
     int opcio;
-    while ((opcio = menu()) != 3) {
+    while ((opcio = menu()) != 4) {
         if (opcio == 1) {
             Alu *alumne = new_Alu();
             if (alumne == NULL) {
@@ -137,19 +141,19 @@ int main() {
                 return NO_MEMORY;
             }
             demanar_alumne(alumne);
-            inserir_rec(alumne, primer);
+            primer = inserir_rec(alumne, primer);
             ++length;
         } else if (opcio == 2) {
-            int niu;
             printf("Introdueix el niu de l'alumne a esborrar: ");
             scanf("%d", &niu);
-            primer = esborrar(niu, primer);
-            --length;
+            if (esborrar(niu, &primer)) {
+                --length;
+            }
+        } else if (opcio == 3) {
+            imprimirllista(primer);
         }
     }
-    imprimirllista(primer);
 
-    printf("\nS'ha llegit informacio de %d linies.\n\n", length);
     return EXIT_SUCCESS;
 }
 
@@ -164,10 +168,11 @@ Alu *new_Alu() {
 int menu() {
     printf("\n1. Insertar alumne.\n"
            "2. Esborrar alumne.\n"
-           "3. Llistar i acabar.\n"
+           "3. Llistar.\n"
+           "4. Acabar.\n"
            "Introdueix una opció: ");
     int opcio = -1;
-    while (opcio < 1 || opcio > 3) {
+    while (opcio < 1 || opcio > 4) {
         scanf("%d", &opcio);
     }
     printf("\n");
@@ -181,24 +186,22 @@ void llegir_alumne(FILE *des_de, Alu *alumne) {
     }
 }
 
-Alu *inserir(Alu *alumne, Alu *llista_ordenada) {
+Alu * inserir(Alu *alumne, Alu *llista_ordenada) {
     Alu *actual = llista_ordenada, *anterior = NULL;
     while (actual->seg != NULL && actual->niu < alumne->niu) {
         anterior = actual;
         actual = actual->seg;
     }
-    if (actual->niu < alumne->niu) {
-        if (actual->seg != NULL) {
-            alumne->seg = actual->seg;
-        }
+    if (actual->niu < alumne->niu) { // actual->seg == NULL => actual is the last element
+        // => alumne->niu is the biggest => alumne must be the last element
         actual->seg = alumne;
-    } else {
-        if (actual == llista_ordenada) {
-            alumne->seg = llista_ordenada;
-            llista_ordenada = alumne; // alumne te el niu més petit de tots, i será el nou principi de la llista
-        } else {
-            anterior->seg = alumne; // si actual != llista_ordenada llavors anterior != NULL
-            alumne->seg = actual;
+    } else { // actual->niu >= alumne->niu
+        if (actual == llista_ordenada) { // if actual is the first element
+            alumne->seg = llista_ordenada; // => alumne->niu is the lowest => alumne must be the first element
+            llista_ordenada = alumne; // => alumne is the pointer to the first element now
+        } else { // actual is not the first element => anterior != NULL
+            anterior->seg = alumne; // actual->niu >= alumne->niu => anterior->seg = alumne
+            alumne->seg = actual; // => alumne->seg = actual
         }
     }
     return llista_ordenada;
@@ -215,40 +218,44 @@ Alu *inserir_rec(Alu *alumne, Alu *llista_ordenada) {
     }
 }
 
-Alu *esborrar(int niu, Alu *llista_alumnes) {
-    Alu *actual = llista_alumnes, *anterior = NULL;
+bool esborrar(int niu, Alu **llista_alumnes) {
+    Alu *actual = *llista_alumnes, *anterior = NULL;
     while (actual != NULL && actual->niu != niu) {
         anterior = actual;
         actual = actual->seg;
     }
     if (actual != NULL) { // And then actual->niu == niu
         if (anterior == NULL) { // And then actual == llista_alumnes, that is, actual is the first element
-            llista_alumnes = llista_alumnes->seg;
+            *llista_alumnes = (*llista_alumnes)->seg;
         } else {
             anterior->seg = actual->seg;
         }
         free(actual);
+        return true;
     }
-    return llista_alumnes;
+    return false;
 }
 
-Alu *esborrar_rec(int niu, Alu *llista_alumnes) {
-    if (llista_alumnes != NULL) {
-        if (llista_alumnes->niu == niu) {
-            Alu *seg = llista_alumnes->seg;
-            free(llista_alumnes);
-            llista_alumnes = seg;
-        } else if (llista_alumnes->seg != NULL) {
-            llista_alumnes->seg = esborrar_rec(niu, llista_alumnes->seg);
+bool esborrar_rec(int niu, Alu **llista_alumnes) {
+    if (*llista_alumnes != NULL) {
+        if ((*llista_alumnes)->niu == niu) {
+            Alu *seg = (*llista_alumnes)->seg;
+            free(*llista_alumnes);
+            *llista_alumnes = seg;
+            return true;
+        } else if ((*llista_alumnes)->seg != NULL) {
+            return esborrar_rec(niu, &(*llista_alumnes)->seg);
         }
     }
-    return llista_alumnes;
+    return false;
 }
 
 void demanar_alumne(Alu *alumne) {
     printf("\nIntrodueix separat per comes: niu, nota1, nota2, nota3, nota4: ");
-    scanf("%d, %f, %f, %f, %f", &alumne->niu, &alumne->notes[0], &alumne->notes[1], &alumne->notes[2],
-          &alumne->notes[3]);
+    while (scanf("%d, %f, %f, %f, %f", &alumne->niu, &alumne->notes[0], &alumne->notes[1], &alumne->notes[2], &alumne->notes[3]) != 5) {
+        printf("\nHeu d'entrar 5 valors, un enter (NIU) i quatre reals (notes): ");
+        flush();
+    }
     alumne->notes[4] = mitjana(alumne->notes, 4);
 }
 
